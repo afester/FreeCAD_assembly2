@@ -1,28 +1,40 @@
-from assembly2lib import *
-from PySide import QtGui, QtCore
-import traceback
-import degreesOfFreedom
 
-moduleVars = {}
+import numpy
+import traceback
+
+from PySide import QtGui, QtCore
+
+import FreeCAD
+import FreeCADGui
+
+import Logging
+from solver.ConstraintSolver import solveConstraints
+import solver.DegreesOfFreedom
+
+
+moduleVars = {} # Hack
+
 
 class AnimateCommand:
+
     def Activated(self):
-        from assembly2solver import solveConstraints
         constraintSystem = solveConstraints(FreeCAD.ActiveDocument)
         self.taskPanel = AnimateDegreesOfFreedomTaskPanel( constraintSystem )
         FreeCADGui.Control.showDialog( self.taskPanel )
-    def GetResources(self): 
+
+    def GetResources(self):
         msg = 'Animate degrees of freedom'
         return {
-            'Pixmap' : ':/assembly2/icons/degreesOfFreedomAnimation.svg', 
-            'MenuText': msg, 
-            'ToolTip':  msg
-            } 
-animateCommand = AnimateCommand()
-FreeCADGui.addCommand('degreesOfFreedomAnimation', animateCommand)
+            'Pixmap'  : ':/assembly/icons/degreesOfFreedomAnimation.svg',
+            'MenuText': msg,
+            'ToolTip' :  msg
+            }
+ 
+FreeCADGui.addCommand('degreesOfFreedomAnimation', AnimateCommand())
 
 
 class AnimateDegreesOfFreedomTaskPanel:
+    
     def __init__(self, constraintSystem):
         self.constraintSystem = constraintSystem
         self.form = FreeCADGui.PySideUic.loadUi( ':/assembly2/ui/degreesOfFreedomAnimation.ui' )
@@ -34,8 +46,7 @@ class AnimateDegreesOfFreedomTaskPanel:
         self.form.pushButton_animateSelected.clicked.connect(self.animateSelected)
         self.form.pushButton_animateAll.clicked.connect(self.animateAll)
         self.form.pushButton_set_as_default.clicked.connect( self.setDefaults )
-        self.setIntialValues()
-    
+        self.setInitialValues()
 
     def _startAnimation(self, degreesOfFreedomToAnimate):
         frames_per_DOF =  self.form.spinBox_frames_per_DOF.value()
@@ -49,23 +60,24 @@ class AnimateDegreesOfFreedomTaskPanel:
             FreeCAD.Console.PrintError('Aborting Animation! Constraint system has no degrees of freedom.')
             FreeCADGui.Control.closeDialog()
 
-    def setIntialValues(self):
+    def setInitialValues(self):
         parms = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Assembly2/degreeOfFreedomAnimation")
-        form = self.form      
+        form = self.form
         form.spinBox_frames_per_DOF.setValue(    parms.GetFloat('frames_per_DOF', 42) )
         form.spinBox_ms_per_frame.setValue(      parms.GetFloat('ms_per_frame', 50) )
         form.doubleSpinBox_rotMag.setValue(      parms.GetFloat('rotation_magnitude', 1.0) )
         form.doubleSpinBox_linMag.setValue(      parms.GetFloat('linear_magnitude', 1.0) )
+        
     def setDefaults(self):
         parms = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Assembly2/degreeOfFreedomAnimation")
-        form = self.form        
+        form = self.form
         parms.SetFloat('frames_per_DOF',       form.spinBox_frames_per_DOF.value()       )
         parms.SetFloat('ms_per_frame',         form.spinBox_ms_per_frame.value()       )
         parms.SetFloat('rotation_magnitude',   form.doubleSpinBox_rotMag.value()       )
         parms.SetFloat('linear_magnitude',     form.doubleSpinBox_linMag.value()       )
 
     def animateSelected(self):
-        debugPrint(4,'pushButton_animateSelected has been clicked')
+        Logging.debug('pushButton_animateSelected has been clicked')
         D_to_animate = []
         for index, d in enumerate( self.constraintSystem.degreesOfFreedom ):
             #debugPrint(4,'getting item at index %i' % index)
@@ -75,6 +87,7 @@ class AnimateDegreesOfFreedomTaskPanel:
                 D_to_animate.append( d )
         if len(D_to_animate) > 0:
             self._startAnimation( D_to_animate )
+
     def animateAll(self):
          self._startAnimation( [d for d in self.constraintSystem.degreesOfFreedom] )
 
@@ -89,8 +102,6 @@ class AnimateDegreesOfFreedomTaskPanel:
         return 0x00200000
 
 
-
-
 class AnimateDOF(object):
     'based on http://freecad-tutorial.blogspot.com/2014/06/piston-conrod-animation.html'
     def __init__(self, constraintSystem, degreesOfFreedomToAnimate, tick=50, framesPerDOF=40, rotationAmplification=1.0, linearDispAmplification=1.0):
@@ -101,7 +112,7 @@ class AnimateDOF(object):
         self.framesPerDOF = framesPerDOF
         self.rotationAmplification = rotationAmplification
         self.linearDispAmplification = linearDispAmplification
-        debugPrint(2,'beginning degrees of freedom animation')
+        Logging.debug('beginning degrees of freedom animation')
         self.count = 0
         self.dof_count = 0
         self.updateAmplitude()
@@ -119,7 +130,7 @@ class AnimateDOF(object):
 
     def renderFrame(self):
         try:
-            debugPrint(5,'timer loop running')
+            Logging.debug('timer loop running')
             self.count = self.count + 1
             D = self.degreesOfFreedomToAnimate
             if self.count > self.framesPerDOF: #placed here so that if is error timer still exits
@@ -132,9 +143,9 @@ class AnimateDOF(object):
                     self.constraintSystem.variableManager.updateFreeCADValues(self.X_before_animation)
                     return
                 self.updateAmplitude()
-                
-            if self.count == 1: debugPrint(3,'animating %s' % D[self.dof_count])
-            debugPrint(4,'dof %i, dof frame %i' % (self.dof_count, self.count))
+
+            if self.count == 1: Logging.debug('animating %s' % D[self.dof_count])
+            Logging.debug('dof %i, dof frame %i' % (self.dof_count, self.count))
             Y = self.Y0.copy()
             r = 2*numpy.pi*( 1.0*self.count/self.framesPerDOF)
             Y[self.dof_count] = self.Y0[self.dof_count] + self.amplitude * numpy.sin(r)
@@ -142,7 +153,7 @@ class AnimateDOF(object):
                 if base_rotation_dof( D[self.dof_count] ) and base_rotation_dof( D[self.dof_count+1] ) and base_rotation_dof( D[self.dof_count+2] ): #then also adjust other base rotation degrees of freedom so that rotation is always visible
                     Y[self.dof_count+1] = self.Y0[self.dof_count+1] +self.amplitude*numpy.sin(r)
                     Y[self.dof_count+2] = self.Y0[self.dof_count+2] +self.amplitude*numpy.sin(r)
-            debugPrint(5,'Y frame %s, sin(r) %1.2f' % (Y,numpy.sin(r)))
+            Logging.debug('Y frame %s, sin(r) %1.2f' % (Y,numpy.sin(r)))
         except:
             self.timer.stop()
             App.Console.PrintError(traceback.format_exc())
@@ -152,15 +163,15 @@ class AnimateDOF(object):
                 d.setValue(y)
                 self.constraintSystem.update()
             self.constraintSystem.variableManager.updateFreeCADValues( self.constraintSystem.variableManager.X )
-            debugPrint(5,'updated assembly')
+            Logging.debug('updated assembly')
         except:
             FreeCAD.Console.PrintError('AnimateDegreeOfFreedom (dof %i, dof frame %i) unable to update constraint system\n'  % (self.dof_count, self.count))
             FreeCAD.Console.PrintError(traceback.format_exc())
-        debugPrint(5,'finished timer loop')
-
+        Logging.debug('finished timer loop')
+        
+        
+        
 def base_rotation_dof(d):
-    if isinstance(d,degreesOfFreedom.PlacementDegreeOfFreedom) and  hasattr(d, 'ind'):
+    if isinstance(d, solver.DegreesOfFreedom.PlacementDegreeOfFreedom) and  hasattr(d, 'ind'):
         return d.ind % 6 > 2
     return False
-
-

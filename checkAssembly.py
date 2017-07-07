@@ -1,12 +1,19 @@
-from assembly2lib import *
-import time, traceback
+import time
+import traceback
+
+import FreeCAD
 from FreeCAD import Base
+import FreeCADGui
+import Part
+import Logging
+from PySide import QtGui, QtCore
 
 moduleVars = {}
 
 class CheckAssemblyCommand:
+
     def Activated(self):
-        debugPrint(2, 'Conducting Assembly Part Overlap Check for: %s' % FreeCAD.ActiveDocument.Label)
+        Logging.debug('Conducting Assembly Part Overlap Check for: %s' % FreeCAD.ActiveDocument.Label)
         objects = [obj for obj in FreeCAD.ActiveDocument.Objects if hasattr(obj, 'Shape') and obj.Name != 'muxedAssembly']
         n = len(objects)
         no_of_checks = 0.5*(n-1)*(n)
@@ -22,7 +29,7 @@ class CheckAssemblyCommand:
             for j in range(i+1, len(objects)):
                 if not p.wasCanceled():
                     msg = 'overlap check between:   "%s"  &  "%s"' % (objects[i].Label, objects[j].Label)
-                    debugPrint(3, '  ' + msg)
+                    Logging.debug('  ' + msg)
                     p.setLabelText(msg)
                     p.setValue(count)
                     if boundBoxesOverlap(objects[i].Shape, objects[j].Shape,  tol = 10**-5 ): #first do a rough check, to speed up checks, on the test case used, time reduce from 11s ->10s ...
@@ -36,14 +43,14 @@ class CheckAssemblyCommand:
                             errorMsgs.append('Unable to perform %s:\n' % msg)
                             FreeCAD.Console.PrintError(traceback.format_exc())
                     else:
-                        debugPrint(3, '    skipping check based on boundBoxesOverlap check')
+                        Logging.debug('    skipping check based on boundBoxesOverlap check')
                     count = count + 1
-                else:            
+                else:
                     break
-        debugPrint(3, 'ProgressDialog canceled %s' % p.wasCanceled())
+        Logging.debug('ProgressDialog canceled %s' % p.wasCanceled())
         if not p.wasCanceled():
             p.setValue(count)
-            debugPrint(2, 'Assembly overlap check duration:    %3.1fs' % (time.time() - t_start) )
+            Logging.debug('Assembly overlap check duration:    %3.1fs' % (time.time() - t_start) )
             errorMsg = '\n\nWARNING: %i Check(s) could not be conducted:\n  - %s' % (len(errorMsgs), "  \n  - ".join(errorMsgs)) if len(errorMsgs) > 0 else ''
             #p.setValue(no_of_checks)
             if len(overlapMsgs) > 0:
@@ -54,13 +61,14 @@ class CheckAssemblyCommand:
                 response = QtGui.QMessageBox.critical(QtGui.qApp.activeWindow(), "Assembly Check", message + errorMsg)#, flags)
             else:
                 QtGui.QMessageBox.information(  QtGui.qApp.activeWindow(), "Assembly Check", "Passed:\n  - No overlap/interferance dectected." + errorMsg)
-    def GetResources(self): 
-        msg = 'Check assembly for part overlap/interferance'
+
+
+    def GetResources(self):
         return {
-            'Pixmap' : ':/assembly2/icons/checkAssembly.svg', 
-            'MenuText': msg, 
-            'ToolTip':  msg
-            } 
+            'Pixmap'  : ':/assembly/icons/checkAssembly.svg',
+            'MenuText': 'Validate assembly',
+            'ToolTip' : 'Check assembly for part overlap/interference'
+            }
 FreeCADGui.addCommand('assembly2_checkAssembly', CheckAssemblyCommand())
 
 
@@ -73,6 +81,6 @@ def boundBoxesOverlap( shape1, shape2, tol ):
         overlap = box1.common(box2)
     except:
         return True
-    overlap_ratio = overlap.Volume / min( box1.Volume, box2.Volume )  
-    debugPrint(3, '    boundBoxesOverlap:overlap_ratio %e' % overlap_ratio)
+    overlap_ratio = overlap.Volume / min( box1.Volume, box2.Volume )
+    Logging.debug('    boundBoxesOverlap:overlap_ratio %e' % overlap_ratio)
     return overlap_ratio > tol

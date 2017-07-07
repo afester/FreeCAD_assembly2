@@ -1,0 +1,23 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/assembly">
+    <file>icons/importPart.svg</file>
+    <file>icons/updateParts.svg</file>
+    <file>icons/movePart.svg</file>
+    <file>icons/circularEdgeConstraint.svg</file>
+    <file>icons/planeConstraint.svg</file>
+    <file>icons/axialConstraint.svg</file>
+    <file>icons/angleConstraint.svg</file>
+    <file>icons/sphericalSurfaceConstraint.svg</file>
+    <file>icons/degreesOfFreedomAnimation.svg</file>
+    <file>icons/solveConstraints.svg</file>
+    <file>icons/muxAssembly.svg</file>
+    <file>icons/muxAssemblyRefresh.svg</file>
+    <file>icons/addPartsList.svg</file>
+    <file>icons/checkAssembly.svg</file>
+    <file>icons/preferences-assembly.svg</file>
+    <file>icons/workBenchIcon.svg</file>
+    <file>ui/PreferencesPage.ui</file>
+    <file>ui/PartsList.ui</file>
+  </qresource>
+</RCC>
